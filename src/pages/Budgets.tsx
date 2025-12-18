@@ -1,62 +1,41 @@
+import { useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { BudgetProgress } from '@/components/BudgetProgress'
-import { Plus, TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react'
-
-interface MockBudget {
-  id: string
-  category: string
-  spent: number
-  limit: number
-  alertLevel: 'OK' | 'WARNING' | 'EXCEEDED'
-}
-
-// Mock data
-const mockBudgets: MockBudget[] = [
-  {
-    id: '1',
-    category: 'Alimentação',
-    spent: 1850,
-    limit: 2000,
-    alertLevel: 'WARNING',
-  },
-  {
-    id: '2',
-    category: 'Transporte',
-    spent: 650,
-    limit: 800,
-    alertLevel: 'WARNING',
-  },
-  {
-    id: '3',
-    category: 'Moradia',
-    spent: 2200,
-    limit: 2000,
-    alertLevel: 'EXCEEDED',
-  },
-  {
-    id: '4',
-    category: 'Entretenimento',
-    spent: 380,
-    limit: 500,
-    alertLevel: 'OK',
-  },
-  {
-    id: '5',
-    category: 'Saúde',
-    spent: 420,
-    limit: 600,
-    alertLevel: 'OK',
-  },
-]
+import { Plus, TrendingUp, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
+import { useAuth, useBudgets, useToast } from '@/hooks'
 
 export default function Budgets() {
-  const okBudgets = mockBudgets.filter(b => b.alertLevel === 'OK')
-  const warningBudgets = mockBudgets.filter(b => b.alertLevel === 'WARNING')
-  const exceededBudgets = mockBudgets.filter(b => b.alertLevel === 'EXCEEDED')
+  const { tenantPhone, loading: authLoading } = useAuth()
+  const { budgets, loading: budgetsLoading, error: budgetsError } = useBudgets(tenantPhone)
+  const { toast } = useToast()
 
-  const totalSpent = mockBudgets.reduce((sum, b) => sum + b.spent, 0)
-  const totalLimit = mockBudgets.reduce((sum, b) => sum + b.limit, 0)
+  // Show errors as toasts
+  useEffect(() => {
+    if (budgetsError) {
+      toast({ title: 'Erro ao carregar orçamentos', description: budgetsError, variant: 'destructive' })
+    }
+  }, [budgetsError, toast])
+
+  const isLoading = authLoading || budgetsLoading
+
+  const okBudgets = budgets.filter(b => b.alert_level === 'OK')
+  const warningBudgets = budgets.filter(b => b.alert_level === 'WARNING')
+  const exceededBudgets = budgets.filter(b => b.alert_level === 'EXCEEDED')
+
+  const totalSpent = budgets.reduce((sum, b) => sum + b.current_spent, 0)
+  const totalLimit = budgets.reduce((sum, b) => sum + b.monthly_limit, 0)
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+          <p className="text-slate-400">Carregando orçamentos...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -161,17 +140,27 @@ export default function Budgets() {
         <h2 className="text-xl font-semibold text-slate-50 mb-4">
           Orçamentos por Categoria
         </h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {mockBudgets.map((budget) => (
-            <BudgetProgress
-              key={budget.id}
-              category={budget.category}
-              spent={budget.spent}
-              limit={budget.limit}
-              alertLevel={budget.alertLevel}
-            />
-          ))}
-        </div>
+        {budgets.length === 0 ? (
+          <Card>
+            <CardContent className="py-8">
+              <p className="text-center text-slate-400">
+                Nenhum orçamento cadastrado. Clique em "Novo Orçamento" para começar.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {budgets.map((budget) => (
+              <BudgetProgress
+                key={budget.id}
+                category={budget.category_name}
+                spent={budget.current_spent}
+                limit={budget.monthly_limit}
+                alertLevel={budget.alert_level}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Alerts Section */}
@@ -190,11 +179,11 @@ export default function Budgets() {
                   <TrendingUp className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-red-400">
-                      Orçamento excedido em {budget.category}
+                      Orçamento excedido em {budget.category_name}
                     </p>
                     <p className="text-xs text-slate-400 mt-1">
                       Você gastou R${' '}
-                      {(budget.spent - budget.limit).toLocaleString('pt-BR', {
+                      {(budget.current_spent - budget.monthly_limit).toLocaleString('pt-BR', {
                         minimumFractionDigits: 2,
                       })}{' '}
                       a mais que o planejado.
@@ -210,11 +199,11 @@ export default function Budgets() {
                   <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-amber-400">
-                      Próximo do limite em {budget.category}
+                      Próximo do limite em {budget.category_name}
                     </p>
                     <p className="text-xs text-slate-400 mt-1">
                       Você já gastou{' '}
-                      {((budget.spent / budget.limit) * 100).toFixed(1)}% do
+                      {((budget.current_spent / budget.monthly_limit) * 100).toFixed(1)}% do
                       orçamento desta categoria.
                     </p>
                   </div>

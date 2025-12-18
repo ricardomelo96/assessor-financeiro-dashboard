@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -18,33 +19,33 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-
-interface MonthData {
-  month: string
-  income: number
-  expense: number
-  balance: number
-}
-
-// Mock data for 12 months
-const mockHistoryData: MonthData[] = [
-  { month: 'Jan 2023', income: 8500, expense: 6200, balance: 2300 },
-  { month: 'Fev 2023', income: 9200, expense: 6800, balance: 2400 },
-  { month: 'Mar 2023', income: 8800, expense: 7100, balance: 1700 },
-  { month: 'Abr 2023', income: 9500, expense: 6500, balance: 3000 },
-  { month: 'Mai 2023', income: 9000, expense: 7300, balance: 1700 },
-  { month: 'Jun 2023', income: 9800, expense: 6900, balance: 2900 },
-  { month: 'Jul 2023', income: 10200, expense: 7500, balance: 2700 },
-  { month: 'Ago 2023', income: 9600, expense: 7800, balance: 1800 },
-  { month: 'Set 2023', income: 10500, expense: 7200, balance: 3300 },
-  { month: 'Out 2023', income: 11000, expense: 8100, balance: 2900 },
-  { month: 'Nov 2023', income: 10800, expense: 7600, balance: 3200 },
-  { month: 'Dez 2023', income: 12500, expense: 9200, balance: 3300 },
-]
+import { useAuth, useSummary, useToast } from '@/hooks'
+import { Loader2 } from 'lucide-react'
 
 export default function History() {
-  const totalIncome = mockHistoryData.reduce((sum, item) => sum + item.income, 0)
-  const totalExpense = mockHistoryData.reduce((sum, item) => sum + item.expense, 0)
+  const { tenantPhone, loading: authLoading } = useAuth()
+  const { historical, loading: summaryLoading, error: summaryError } = useSummary(tenantPhone)
+  const { toast } = useToast()
+
+  // Show errors as toasts
+  useEffect(() => {
+    if (summaryError) {
+      toast({ title: 'Erro ao carregar histórico', description: summaryError, variant: 'destructive' })
+    }
+  }, [summaryError, toast])
+
+  const isLoading = authLoading || summaryLoading
+
+  // Transform data for chart (reversed to show oldest first)
+  const chartData = [...historical].reverse().map(h => ({
+    month: h.month_name,
+    income: h.total_income,
+    expense: h.total_expense,
+    balance: h.balance,
+  }))
+
+  const totalIncome = historical.reduce((sum, item) => sum + item.total_income, 0)
+  const totalExpense = historical.reduce((sum, item) => sum + item.total_expense, 0)
   const totalBalance = totalIncome - totalExpense
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -64,6 +65,19 @@ export default function History() {
     return null
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+          <p className="text-slate-400">Carregando histórico...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const monthCount = historical.length || 0
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -77,7 +91,7 @@ export default function History() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-400">
-              Total Receitas (12 meses)
+              Total Receitas ({monthCount} {monthCount === 1 ? 'mês' : 'meses'})
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -90,7 +104,7 @@ export default function History() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-400">
-              Total Despesas (12 meses)
+              Total Despesas ({monthCount} {monthCount === 1 ? 'mês' : 'meses'})
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -117,62 +131,68 @@ export default function History() {
       {/* Area Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Evolução Financeira (12 Meses)</CardTitle>
+          <CardTitle>Evolução Financeira</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[400px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={mockHistoryData}
-                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis
-                  dataKey="month"
-                  stroke="#94a3b8"
-                  tick={{ fill: '#94a3b8' }}
-                />
-                <YAxis
-                  stroke="#94a3b8"
-                  tick={{ fill: '#94a3b8' }}
-                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend
-                  wrapperStyle={{ paddingTop: '20px' }}
-                  iconType="square"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="income"
-                  stroke="#22c55e"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorIncome)"
-                  name="Receitas"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="expense"
-                  stroke="#ef4444"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorExpense)"
-                  name="Despesas"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          {chartData.length === 0 ? (
+            <div className="h-[400px] flex items-center justify-center">
+              <p className="text-slate-400">Nenhum dado histórico disponível</p>
+            </div>
+          ) : (
+            <div className="h-[400px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis
+                    dataKey="month"
+                    stroke="#94a3b8"
+                    tick={{ fill: '#94a3b8' }}
+                  />
+                  <YAxis
+                    stroke="#94a3b8"
+                    tick={{ fill: '#94a3b8' }}
+                    tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend
+                    wrapperStyle={{ paddingTop: '20px' }}
+                    iconType="square"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="income"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorIncome)"
+                    name="Receitas"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="expense"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorExpense)"
+                    name="Despesas"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -182,40 +202,44 @@ export default function History() {
           <CardTitle>Resumo Mensal</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Mês</TableHead>
-                <TableHead className="text-right">Receitas</TableHead>
-                <TableHead className="text-right">Despesas</TableHead>
-                <TableHead className="text-right">Saldo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mockHistoryData.map((item) => (
-                <TableRow key={item.month}>
-                  <TableCell className="font-medium">{item.month}</TableCell>
-                  <TableCell className="text-right text-green-500">
-                    {formatCurrency(item.income)}
-                  </TableCell>
-                  <TableCell className="text-right text-red-500">
-                    {formatCurrency(item.expense)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span
-                      className={
-                        item.balance >= 0
-                          ? 'text-blue-400 font-semibold'
-                          : 'text-red-400 font-semibold'
-                      }
-                    >
-                      {formatCurrency(item.balance)}
-                    </span>
-                  </TableCell>
+          {historical.length === 0 ? (
+            <p className="text-slate-400 text-center py-4">Nenhum dado histórico disponível</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Mês</TableHead>
+                  <TableHead className="text-right">Receitas</TableHead>
+                  <TableHead className="text-right">Despesas</TableHead>
+                  <TableHead className="text-right">Saldo</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {historical.map((item) => (
+                  <TableRow key={item.month_year}>
+                    <TableCell className="font-medium">{item.month_name}</TableCell>
+                    <TableCell className="text-right text-green-500">
+                      {formatCurrency(item.total_income)}
+                    </TableCell>
+                    <TableCell className="text-right text-red-500">
+                      {formatCurrency(item.total_expense)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span
+                        className={
+                          item.balance >= 0
+                            ? 'text-blue-400 font-semibold'
+                            : 'text-red-400 font-semibold'
+                        }
+                      >
+                        {formatCurrency(item.balance)}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

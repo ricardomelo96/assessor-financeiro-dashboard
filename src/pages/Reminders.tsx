@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState, useEffect } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -12,82 +12,74 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Plus, Calendar, DollarSign, CheckCircle2 } from 'lucide-react'
-
-interface MockReminder {
-  id: string
-  title: string
-  amount: number
-  dueDate: string
-  status: 'pending' | 'paid' | 'overdue'
-  category?: string
-}
-
-// Mock data
-const mockReminders: MockReminder[] = [
-  { id: '1', title: 'Aluguel', amount: 1500, dueDate: '2024-01-05', status: 'pending', category: 'Moradia' },
-  { id: '2', title: 'Conta de Luz', amount: 230, dueDate: '2024-01-10', status: 'pending', category: 'Utilidades' },
-  { id: '3', title: 'Internet', amount: 120, dueDate: '2024-01-15', status: 'pending', category: 'Utilidades' },
-  { id: '4', title: 'Cartão de Crédito', amount: 850, dueDate: '2024-01-20', status: 'pending', category: 'Finanças' },
-  { id: '5', title: 'Academia', amount: 150, dueDate: '2024-01-25', status: 'pending', category: 'Saúde' },
-  { id: '6', title: 'Netflix', amount: 45, dueDate: '2023-12-20', status: 'paid', category: 'Entretenimento' },
-  { id: '7', title: 'Spotify', amount: 25, dueDate: '2023-12-15', status: 'paid', category: 'Entretenimento' },
-  { id: '8', title: 'Seguro do Carro', amount: 320, dueDate: '2023-12-10', status: 'paid', category: 'Transporte' },
-  { id: '9', title: 'Condomínio', amount: 450, dueDate: '2023-11-30', status: 'overdue', category: 'Moradia' },
-  { id: '10', title: 'Conta de Água', amount: 80, dueDate: '2023-11-25', status: 'overdue', category: 'Utilidades' },
-]
+import { Plus, Calendar, DollarSign, CheckCircle2, Loader2 } from 'lucide-react'
+import { useAuth, useReminders, useToast } from '@/hooks'
+import type { Reminder } from '@/types'
 
 export default function Reminders() {
-  const [reminders, setReminders] = useState<MockReminder[]>(mockReminders)
-  const [selectedReminder, setSelectedReminder] = useState<MockReminder | null>(null)
+  const { tenantPhone, loading: authLoading } = useAuth()
+  const { pendingReminders, paidReminders, overdueReminders, loading: remindersLoading, error: remindersError, markAsPaid } = useReminders(tenantPhone)
+  const { toast } = useToast()
+
+  const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isMarking, setIsMarking] = useState(false)
 
-  const pendingReminders = reminders.filter(r => r.status === 'pending')
-  const paidReminders = reminders.filter(r => r.status === 'paid')
-  const overdueReminders = reminders.filter(r => r.status === 'overdue')
+  // Show errors as toasts
+  useEffect(() => {
+    if (remindersError) {
+      toast({ title: 'Erro ao carregar lembretes', description: remindersError, variant: 'destructive' })
+    }
+  }, [remindersError, toast])
 
-  const handleMarkAsPaid = (reminder: MockReminder) => {
+  const isLoading = authLoading || remindersLoading
+
+  const handleMarkAsPaid = (reminder: Reminder) => {
     setSelectedReminder(reminder)
     setIsDialogOpen(true)
   }
 
-  const confirmMarkAsPaid = () => {
+  const confirmMarkAsPaid = async () => {
     if (selectedReminder) {
-      setReminders(prev =>
-        prev.map(r =>
-          r.id === selectedReminder.id ? { ...r, status: 'paid' } : r
-        )
-      )
+      setIsMarking(true)
+      const result = await markAsPaid(selectedReminder.title)
+      setIsMarking(false)
+
+      if (result.success) {
+        toast({ title: 'Sucesso', description: 'Lembrete marcado como pago' })
+      } else {
+        toast({ title: 'Erro', description: result.error || 'Erro ao marcar como pago', variant: 'destructive' })
+      }
     }
     setIsDialogOpen(false)
     setSelectedReminder(null)
   }
 
-  const getStatusBadge = (status: MockReminder['status']) => {
-    switch (status) {
-      case 'pending':
-        return <Badge variant="warning">Pendente</Badge>
-      case 'paid':
-        return <Badge variant="success">Pago</Badge>
-      case 'overdue':
-        return <Badge variant="danger">Vencido</Badge>
+  const getStatusBadge = (reminder: Reminder) => {
+    if (reminder.is_paid) {
+      return <Badge variant="success">Pago</Badge>
     }
+    const isOverdue = new Date(reminder.due_date) < new Date()
+    if (isOverdue) {
+      return <Badge variant="danger">Vencido</Badge>
+    }
+    return <Badge variant="warning">Pendente</Badge>
   }
 
-  const ReminderCard = ({ reminder }: { reminder: MockReminder }) => (
+  const ReminderCard = ({ reminder, showMarkButton = false }: { reminder: Reminder; showMarkButton?: boolean }) => (
     <Card className="hover:bg-slate-700/50 transition-colors">
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex-1 space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-slate-50">{reminder.title}</h3>
-              {getStatusBadge(reminder.status)}
+              {getStatusBadge(reminder)}
             </div>
 
             <div className="flex items-center gap-4 text-sm text-slate-400">
               <div className="flex items-center gap-1">
                 <Calendar className="h-4 w-4" />
-                <span>{formatDate(reminder.dueDate)}</span>
+                <span>{formatDate(reminder.due_date)}</span>
               </div>
               <div className="flex items-center gap-1">
                 <DollarSign className="h-4 w-4" />
@@ -95,12 +87,12 @@ export default function Reminders() {
               </div>
             </div>
 
-            {reminder.category && (
-              <div className="text-xs text-slate-500">{reminder.category}</div>
+            {reminder.category_name && (
+              <div className="text-xs text-slate-500">{reminder.category_name}</div>
             )}
           </div>
 
-          {reminder.status === 'pending' && (
+          {showMarkButton && !reminder.is_paid && (
             <Button
               size="sm"
               variant="outline"
@@ -115,6 +107,17 @@ export default function Reminders() {
       </CardContent>
     </Card>
   )
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+          <p className="text-slate-400">Carregando lembretes...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -153,7 +156,7 @@ export default function Reminders() {
             </Card>
           ) : (
             pendingReminders.map(reminder => (
-              <ReminderCard key={reminder.id} reminder={reminder} />
+              <ReminderCard key={reminder.id} reminder={reminder} showMarkButton />
             ))
           )}
         </TabsContent>
@@ -181,7 +184,7 @@ export default function Reminders() {
             </Card>
           ) : (
             overdueReminders.map(reminder => (
-              <ReminderCard key={reminder.id} reminder={reminder} />
+              <ReminderCard key={reminder.id} reminder={reminder} showMarkButton />
             ))
           )}
         </TabsContent>
@@ -200,11 +203,19 @@ export default function Reminders() {
             <Button
               variant="outline"
               onClick={() => setIsDialogOpen(false)}
+              disabled={isMarking}
             >
               Cancelar
             </Button>
-            <Button onClick={confirmMarkAsPaid}>
-              Confirmar
+            <Button onClick={confirmMarkAsPaid} disabled={isMarking}>
+              {isMarking ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                'Confirmar'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

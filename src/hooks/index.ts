@@ -1,6 +1,7 @@
-export { useAuth } from './useAuth'
+export { useAuth } from '@/contexts/AuthContext'
 export { useSummary } from './useSummary'
 export { useTransactions } from './useTransactions'
 export { useReminders } from './useReminders'
 export { useCategories } from './useCategories'
 export { useBudgets } from './useBudgets'
+export { useToast, toast } from './use-toast'

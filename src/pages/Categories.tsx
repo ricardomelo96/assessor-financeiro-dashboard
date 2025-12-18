@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect } from 'react'
 import {
   ShoppingCart,
   Car,
@@ -8,11 +8,13 @@ import {
   MoreHorizontal,
   DollarSign,
   Briefcase,
+  Loader2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CategoryDonutChart } from '@/components/CategoryDonutChart'
 import { formatCurrency } from '@/lib/utils'
+import { useAuth, useCategories, useToast } from '@/hooks'
 import type { CategorySpending, Category } from '@/types'
 
 // Icon mapping
@@ -27,145 +29,6 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   briefcase: Briefcase,
 }
 
-// Mock data for categories
-const mockCategories: (Category & { icon_name: string })[] = [
-  {
-    id: '1',
-    tenant_id: '1',
-    name: 'Alimentacao',
-    type: 'expense',
-    icon: 'shopping',
-    icon_name: 'shopping',
-    sort_order: 1,
-  },
-  {
-    id: '2',
-    tenant_id: '1',
-    name: 'Transporte',
-    type: 'expense',
-    icon: 'car',
-    icon_name: 'car',
-    sort_order: 2,
-  },
-  {
-    id: '3',
-    tenant_id: '1',
-    name: 'Moradia',
-    type: 'expense',
-    icon: 'home',
-    icon_name: 'home',
-    sort_order: 3,
-  },
-  {
-    id: '4',
-    tenant_id: '1',
-    name: 'Lazer',
-    type: 'expense',
-    icon: 'smile',
-    icon_name: 'smile',
-    sort_order: 4,
-  },
-  {
-    id: '5',
-    tenant_id: '1',
-    name: 'Saude',
-    type: 'expense',
-    icon: 'heart',
-    icon_name: 'heart',
-    sort_order: 5,
-  },
-  {
-    id: '6',
-    tenant_id: '1',
-    name: 'Outros',
-    type: 'expense',
-    icon: 'more',
-    icon_name: 'more',
-    sort_order: 6,
-  },
-  {
-    id: '7',
-    tenant_id: '1',
-    name: 'Salario',
-    type: 'income',
-    icon: 'dollar',
-    icon_name: 'dollar',
-    sort_order: 1,
-  },
-  {
-    id: '8',
-    tenant_id: '1',
-    name: 'Renda Extra',
-    type: 'income',
-    icon: 'briefcase',
-    icon_name: 'briefcase',
-    sort_order: 2,
-  },
-]
-
-// Mock spending data
-const mockExpenseSpending: CategorySpending[] = [
-  {
-    category_id: '1',
-    category_name: 'Alimentacao',
-    total_spent: 850.0,
-    percentage_of_total: 30.0,
-    transaction_count: 15,
-  },
-  {
-    category_id: '2',
-    category_name: 'Transporte',
-    total_spent: 450.0,
-    percentage_of_total: 16.0,
-    transaction_count: 8,
-  },
-  {
-    category_id: '3',
-    category_name: 'Moradia',
-    total_spent: 1200.0,
-    percentage_of_total: 42.0,
-    transaction_count: 3,
-  },
-  {
-    category_id: '4',
-    category_name: 'Lazer',
-    total_spent: 200.0,
-    percentage_of_total: 7.0,
-    transaction_count: 4,
-  },
-  {
-    category_id: '5',
-    category_name: 'Saude',
-    total_spent: 100.0,
-    percentage_of_total: 3.5,
-    transaction_count: 2,
-  },
-  {
-    category_id: '6',
-    category_name: 'Outros',
-    total_spent: 50.0,
-    percentage_of_total: 1.5,
-    transaction_count: 1,
-  },
-]
-
-const mockIncomeSpending: CategorySpending[] = [
-  {
-    category_id: '7',
-    category_name: 'Salario',
-    total_spent: 5000.0,
-    percentage_of_total: 83.0,
-    transaction_count: 1,
-  },
-  {
-    category_id: '8',
-    category_name: 'Renda Extra',
-    total_spent: 1000.0,
-    percentage_of_total: 17.0,
-    transaction_count: 3,
-  },
-]
-
 const COLORS = [
   '#3b82f6', // blue-500
   '#22c55e', // green-500
@@ -176,26 +39,44 @@ const COLORS = [
 ]
 
 export default function Categories() {
-  const [expenseData] = useState<CategorySpending[]>(mockExpenseSpending)
-  const [incomeData] = useState<CategorySpending[]>(mockIncomeSpending)
+  const { tenantPhone, loading: authLoading } = useAuth()
+  const { categories, incomeCategories, expenseCategories, spending, loading: categoriesLoading, error: categoriesError } = useCategories(tenantPhone)
+  const { toast } = useToast()
 
-  const expenseCategories = mockCategories.filter((cat) => cat.type === 'expense')
-  const incomeCategories = mockCategories.filter((cat) => cat.type === 'income')
+  // Show errors as toasts
+  useEffect(() => {
+    if (categoriesError) {
+      toast({ title: 'Erro ao carregar categorias', description: categoriesError, variant: 'destructive' })
+    }
+  }, [categoriesError, toast])
 
-  const totalExpenses = expenseData.reduce((sum, item) => sum + item.total_spent, 0)
-  const totalIncome = incomeData.reduce((sum, item) => sum + item.total_spent, 0)
+  const isLoading = authLoading || categoriesLoading
+
+  // Split spending by type based on category
+  const expenseSpending = spending.filter(s => {
+    const cat = categories.find(c => c.id === s.category_id)
+    return cat?.type === 'expense'
+  })
+
+  const incomeSpending = spending.filter(s => {
+    const cat = categories.find(c => c.id === s.category_id)
+    return cat?.type === 'income'
+  })
+
+  const totalExpenses = expenseSpending.reduce((sum, item) => sum + (item.total_spent || 0), 0)
+  const totalIncome = incomeSpending.reduce((sum, item) => sum + (item.total_spent || 0), 0)
 
   const renderCategoryList = (
-    categories: typeof mockCategories,
+    cats: Category[],
     spendingData: CategorySpending[],
-    total: number,
+    _total: number,
     type: 'expense' | 'income'
   ) => {
     return (
       <div className="space-y-3">
-        {categories.map((category, index) => {
-          const spending = spendingData.find((s) => s.category_id === category.id)
-          const Icon = iconMap[category.icon_name] || MoreHorizontal
+        {cats.map((category, index) => {
+          const categorySpending = spendingData.find((s) => s.category_id === category.id)
+          const Icon = iconMap[category.icon || 'more'] || MoreHorizontal
           const color = COLORS[index % COLORS.length]
 
           return (
@@ -218,7 +99,7 @@ export default function Categories() {
                     </Badge>
                   </div>
                   <p className="text-sm text-slate-400 mt-1">
-                    {spending?.transaction_count || 0} transacoes este mes
+                    {categorySpending?.transaction_count || 0} transações este mês
                   </p>
                 </div>
               </div>
@@ -228,15 +109,29 @@ export default function Categories() {
                     type === 'income' ? 'text-green-500' : 'text-red-500'
                   }`}
                 >
-                  {formatCurrency(spending?.total_spent || 0)}
+                  {formatCurrency(categorySpending?.total_spent || 0)}
                 </p>
                 <p className="text-sm text-slate-400">
-                  {spending?.percentage_of_total.toFixed(1) || 0}% do total
+                  {categorySpending?.percentage_of_total?.toFixed(1) || 0}% do total
                 </p>
               </div>
             </div>
           )
         })}
+        {cats.length === 0 && (
+          <p className="text-slate-400 text-center py-4">Nenhuma categoria encontrada</p>
+        )}
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+          <p className="text-slate-400">Carregando categorias...</p>
+        </div>
       </div>
     )
   }
@@ -256,13 +151,13 @@ export default function Categories() {
           {/* Chart */}
           <Card>
             <CardHeader>
-              <CardTitle>Distribuicao de Despesas</CardTitle>
+              <CardTitle>Distribuição de Despesas</CardTitle>
               <p className="text-sm text-slate-400">
                 Total: {formatCurrency(totalExpenses)}
               </p>
             </CardHeader>
             <CardContent>
-              <CategoryDonutChart data={expenseData} />
+              <CategoryDonutChart data={expenseSpending} />
             </CardContent>
           </Card>
 
@@ -272,7 +167,7 @@ export default function Categories() {
               <CardTitle>Categorias de Despesas</CardTitle>
             </CardHeader>
             <CardContent>
-              {renderCategoryList(expenseCategories, expenseData, totalExpenses, 'expense')}
+              {renderCategoryList(expenseCategories, expenseSpending, totalExpenses, 'expense')}
             </CardContent>
           </Card>
         </div>
@@ -285,13 +180,13 @@ export default function Categories() {
           {/* Chart */}
           <Card>
             <CardHeader>
-              <CardTitle>Distribuicao de Receitas</CardTitle>
+              <CardTitle>Distribuição de Receitas</CardTitle>
               <p className="text-sm text-slate-400">
                 Total: {formatCurrency(totalIncome)}
               </p>
             </CardHeader>
             <CardContent>
-              <CategoryDonutChart data={incomeData} />
+              <CategoryDonutChart data={incomeSpending} />
             </CardContent>
           </Card>
 
@@ -301,7 +196,7 @@ export default function Categories() {
               <CardTitle>Categorias de Receitas</CardTitle>
             </CardHeader>
             <CardContent>
-              {renderCategoryList(incomeCategories, incomeData, totalIncome, 'income')}
+              {renderCategoryList(incomeCategories, incomeSpending, totalIncome, 'income')}
             </CardContent>
           </Card>
         </div>

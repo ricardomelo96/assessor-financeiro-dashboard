@@ -57,7 +57,7 @@ export function useAuth() {
       const { data, error } = await supabase
         .from('tenants')
         .select('*')
-        .eq('id', userId)
+        .eq('user_id', userId)
         .single();
 
       if (error) {

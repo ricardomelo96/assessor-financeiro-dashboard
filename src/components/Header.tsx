@@ -1,5 +1,4 @@
-import React from 'react'
-import { Bell, User, LogOut, Settings } from 'lucide-react'
+import { Bell, LogOut, Settings } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,

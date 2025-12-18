@@ -1,6 +1,7 @@
 import React from 'react'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
+import { Toaster } from '@/components/ui/toaster'
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -24,6 +25,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           </div>
         </main>
       </div>
+      <Toaster />
     </div>
   )
 }

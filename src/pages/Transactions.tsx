@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Search, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -30,139 +30,19 @@ import {
 } from '@/components/ui/table'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import type { Transaction } from '@/types'
-
-// Mock data
-const mockTransactions: Transaction[] = [
-  {
-    id: '1',
-    tenant_id: '1',
-    type: 'expense',
-    amount: 150.00,
-    description: 'Supermercado Extra',
-    category_id: '1',
-    category_name: 'Alimentacao',
-    date: '2024-12-15',
-    created_at: '2024-12-15T10:30:00Z',
-  },
-  {
-    id: '2',
-    tenant_id: '1',
-    type: 'income',
-    amount: 5000.00,
-    description: 'Salario',
-    category_id: '2',
-    category_name: 'Salario',
-    date: '2024-12-10',
-    created_at: '2024-12-10T08:00:00Z',
-  },
-  {
-    id: '3',
-    tenant_id: '1',
-    type: 'expense',
-    amount: 80.00,
-    description: 'Uber',
-    category_id: '3',
-    category_name: 'Transporte',
-    date: '2024-12-14',
-    created_at: '2024-12-14T18:45:00Z',
-  },
-  {
-    id: '4',
-    tenant_id: '1',
-    type: 'expense',
-    amount: 1200.00,
-    description: 'Aluguel',
-    category_id: '4',
-    category_name: 'Moradia',
-    date: '2024-12-05',
-    created_at: '2024-12-05T09:00:00Z',
-  },
-  {
-    id: '5',
-    tenant_id: '1',
-    type: 'expense',
-    amount: 120.00,
-    description: 'Cinema',
-    category_id: '5',
-    category_name: 'Lazer',
-    date: '2024-12-12',
-    created_at: '2024-12-12T20:00:00Z',
-  },
-  {
-    id: '6',
-    tenant_id: '1',
-    type: 'expense',
-    amount: 200.00,
-    description: 'Farmacia',
-    category_id: '6',
-    category_name: 'Saude',
-    date: '2024-12-08',
-    created_at: '2024-12-08T14:30:00Z',
-  },
-  {
-    id: '7',
-    tenant_id: '1',
-    type: 'income',
-    amount: 500.00,
-    description: 'Freelance',
-    category_id: '7',
-    category_name: 'Renda Extra',
-    date: '2024-12-13',
-    created_at: '2024-12-13T16:00:00Z',
-  },
-  {
-    id: '8',
-    tenant_id: '1',
-    type: 'expense',
-    amount: 45.00,
-    description: 'Padaria',
-    category_id: '1',
-    category_name: 'Alimentacao',
-    date: '2024-12-16',
-    created_at: '2024-12-16T07:30:00Z',
-  },
-  {
-    id: '9',
-    tenant_id: '1',
-    type: 'expense',
-    amount: 300.00,
-    description: 'Internet e TV',
-    category_id: '8',
-    category_name: 'Outros',
-    date: '2024-12-07',
-    created_at: '2024-12-07T11:00:00Z',
-  },
-  {
-    id: '10',
-    tenant_id: '1',
-    type: 'expense',
-    amount: 60.00,
-    description: 'App de Transporte',
-    category_id: '3',
-    category_name: 'Transporte',
-    date: '2024-12-11',
-    created_at: '2024-12-11T19:15:00Z',
-  },
-]
-
-const mockCategories = [
-  { id: '1', name: 'Alimentacao', type: 'expense' },
-  { id: '2', name: 'Salario', type: 'income' },
-  { id: '3', name: 'Transporte', type: 'expense' },
-  { id: '4', name: 'Moradia', type: 'expense' },
-  { id: '5', name: 'Lazer', type: 'expense' },
-  { id: '6', name: 'Saude', type: 'expense' },
-  { id: '7', name: 'Renda Extra', type: 'income' },
-  { id: '8', name: 'Outros', type: 'expense' },
-]
+import { useAuth, useTransactions, useCategories, useToast } from '@/hooks'
 
 export default function Transactions() {
-  const [transactions] = useState<Transaction[]>(mockTransactions)
+  const { tenantPhone, loading: authLoading } = useAuth()
+  const { transactions, loading: transactionsLoading, error: transactionsError, addTransaction } = useTransactions({ tenantPhone })
+  const { categories, incomeCategories, expenseCategories, loading: categoriesLoading, error: categoriesError } = useCategories(tenantPhone)
+  const { toast } = useToast()
+
   const [filterType, setFilterType] = useState<string>('all')
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // New transaction form state
   const [newTransaction, setNewTransaction] = useState({
@@ -172,6 +52,18 @@ export default function Transactions() {
     category_id: '',
     date: new Date().toISOString().split('T')[0],
   })
+
+  // Show errors as toasts
+  useEffect(() => {
+    if (transactionsError) {
+      toast({ title: 'Erro ao carregar transações', description: transactionsError, variant: 'destructive' })
+    }
+    if (categoriesError) {
+      toast({ title: 'Erro ao carregar categorias', description: categoriesError, variant: 'destructive' })
+    }
+  }, [transactionsError, categoriesError, toast])
+
+  const isLoading = authLoading || transactionsLoading || categoriesLoading
 
   const filteredTransactions = transactions.filter((transaction) => {
     const typeMatch = filterType === 'all' || transaction.type === filterType
@@ -184,44 +76,71 @@ export default function Transactions() {
     return typeMatch && categoryMatch && searchMatch
   })
 
-  const handleCreateTransaction = () => {
-    // In real app, this would call an API
-    console.log('Creating transaction:', newTransaction)
-    setIsDialogOpen(false)
-    // Reset form
-    setNewTransaction({
-      type: 'expense',
-      amount: '',
-      description: '',
-      category_id: '',
-      date: new Date().toISOString().split('T')[0],
+  const handleCreateTransaction = async () => {
+    if (!newTransaction.amount || !newTransaction.description || !newTransaction.category_id) {
+      toast({ title: 'Erro', description: 'Preencha todos os campos obrigatórios', variant: 'destructive' })
+      return
+    }
+
+    setIsSubmitting(true)
+    const result = await addTransaction({
+      type: newTransaction.type,
+      amount: parseFloat(newTransaction.amount),
+      description: newTransaction.description,
+      category_id: newTransaction.category_id,
+      date: newTransaction.date,
     })
+    setIsSubmitting(false)
+
+    if (result.success) {
+      toast({ title: 'Sucesso', description: 'Transação criada com sucesso' })
+      setIsDialogOpen(false)
+      // Reset form
+      setNewTransaction({
+        type: 'expense',
+        amount: '',
+        description: '',
+        category_id: '',
+        date: new Date().toISOString().split('T')[0],
+      })
+    } else {
+      toast({ title: 'Erro', description: result.error || 'Erro ao criar transação', variant: 'destructive' })
+    }
   }
 
-  const availableCategories = mockCategories.filter(
-    (cat) => newTransaction.type === 'income' ? cat.type === 'income' : cat.type === 'expense'
-  )
+  const availableCategories = newTransaction.type === 'income' ? incomeCategories : expenseCategories
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+          <p className="text-slate-400">Carregando transações...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50">Transacoes</h1>
-          <p className="text-slate-400 mt-1">Gerencie suas transacoes financeiras</p>
+          <h1 className="text-3xl font-bold text-slate-50">Transações</h1>
+          <p className="text-slate-400 mt-1">Gerencie suas transações financeiras</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700">
               <Plus className="mr-2 h-4 w-4" />
-              Nova Transacao
+              Nova Transação
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Nova Transacao</DialogTitle>
+              <DialogTitle>Nova Transação</DialogTitle>
               <DialogDescription>
-                Adicione uma nova transacao ao seu registro financeiro
+                Adicione uma nova transação ao seu registro financeiro
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -270,7 +189,7 @@ export default function Transactions() {
 
               {/* Description */}
               <div className="space-y-2">
-                <Label htmlFor="description">Descricao</Label>
+                <Label htmlFor="description">Descrição</Label>
                 <Input
                   id="description"
                   placeholder="Ex: Compras no supermercado"
@@ -321,11 +240,23 @@ export default function Transactions() {
                 variant="outline"
                 onClick={() => setIsDialogOpen(false)}
                 className="border-slate-700"
+                disabled={isSubmitting}
               >
                 Cancelar
               </Button>
-              <Button onClick={handleCreateTransaction} className="bg-blue-600 hover:bg-blue-700">
-                Salvar
+              <Button
+                onClick={handleCreateTransaction}
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -360,7 +291,7 @@ export default function Transactions() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {mockCategories.map((category) => (
+                  {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
                     </SelectItem>
@@ -375,7 +306,7 @@ export default function Transactions() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Buscar por descricao..."
+                  placeholder="Buscar por descrição..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9"
@@ -389,14 +320,14 @@ export default function Transactions() {
       {/* Transactions Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Transacoes</CardTitle>
+          <CardTitle>Lista de Transações</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
-                <TableHead>Descricao</TableHead>
+                <TableHead>Descrição</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
               </TableRow>
@@ -405,7 +336,7 @@ export default function Transactions() {
               {filteredTransactions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center text-slate-400">
-                    Nenhuma transacao encontrada
+                    Nenhuma transação encontrada
                   </TableCell>
                 </TableRow>
               ) : (
