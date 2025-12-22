@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const rpcPromise = supabase.rpc('get_my_tenant')
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('RPC timeout after 5 seconds')), 5000)
+        setTimeout(() => reject(new Error('RPC timeout after 10 seconds')), 10000)
       )
 
       const { data, error } = await Promise.race([rpcPromise, timeoutPromise]) as Awaited<typeof rpcPromise>
