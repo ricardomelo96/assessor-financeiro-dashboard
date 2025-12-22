@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Plus, Search, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -65,16 +65,19 @@ export default function Transactions() {
 
   const isLoading = authLoading || transactionsLoading || categoriesLoading
 
-  const filteredTransactions = transactions.filter((transaction) => {
-    const typeMatch = filterType === 'all' || transaction.type === filterType
-    const categoryMatch =
-      filterCategory === 'all' || transaction.category_id === filterCategory
-    const searchMatch = transaction.description
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
+  const filteredTransactions = useMemo(() =>
+    transactions.filter((transaction) => {
+      const typeMatch = filterType === 'all' || transaction.type === filterType
+      const categoryMatch =
+        filterCategory === 'all' || transaction.category_id === filterCategory
+      const searchMatch = transaction.description
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
 
-    return typeMatch && categoryMatch && searchMatch
-  })
+      return typeMatch && categoryMatch && searchMatch
+    }),
+    [transactions, filterType, filterCategory, searchTerm]
+  )
 
   const handleCreateTransaction = async () => {
     if (!newTransaction.amount || !newTransaction.description || !newTransaction.category_id) {

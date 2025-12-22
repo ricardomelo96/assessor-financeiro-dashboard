@@ -9,7 +9,9 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { EmptyState } from '@/components'
 import { formatCurrency } from '@/lib/utils'
+import { TrendingUp } from 'lucide-react'
 
 interface TrendData {
   month_name: string
@@ -22,10 +24,27 @@ interface TrendChartProps {
 }
 
 export default function TrendChart({ data }: TrendChartProps) {
+  if (!data || data.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Tendencia de Receitas e Despesas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmptyState
+            icon={<TrendingUp className="h-12 w-12" />}
+            title="Sem dados de historico"
+            description="Os dados de tendencia aparecerao aqui apos suas primeiras transacoes."
+          />
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tendência de Receitas e Despesas</CardTitle>
+        <CardTitle>Tendencia de Receitas e Despesas</CardTitle>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>

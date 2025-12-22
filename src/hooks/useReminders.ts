@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Reminder } from '@/types'
 
@@ -30,6 +30,7 @@ export function useReminders(tenantPhone: string | undefined) {
   useEffect(() => {
     if (!tenantPhone) {
       setLoading(false)
+      setError('Telefone do tenant nao disponivel. Faca login novamente.')
       return
     }
 
@@ -95,9 +96,18 @@ export function useReminders(tenantPhone: string | undefined) {
     }
   }
 
-  const pendingReminders = reminders.filter(r => !r.is_paid && new Date(r.due_date) >= new Date())
-  const paidReminders = reminders.filter(r => r.is_paid)
-  const overdueReminders = reminders.filter(r => !r.is_paid && new Date(r.due_date) < new Date())
+  const pendingReminders = useMemo(() =>
+    reminders.filter(r => !r.is_paid && new Date(r.due_date) >= new Date()),
+    [reminders]
+  )
+  const paidReminders = useMemo(() =>
+    reminders.filter(r => r.is_paid),
+    [reminders]
+  )
+  const overdueReminders = useMemo(() =>
+    reminders.filter(r => !r.is_paid && new Date(r.due_date) < new Date()),
+    [reminders]
+  )
 
   return {
     reminders,

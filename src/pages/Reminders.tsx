@@ -10,7 +10,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Plus, Calendar, DollarSign, CheckCircle2, Loader2 } from 'lucide-react'
 import { useAuth, useReminders, useToast } from '@/hooks'
@@ -24,6 +29,15 @@ export default function Reminders() {
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isMarking, setIsMarking] = useState(false)
+
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [newReminder, setNewReminder] = useState({
+    title: '',
+    amount: '',
+    due_date: new Date().toISOString().split('T')[0],
+    type: 'bill' as 'bill' | 'receivable' | 'custom',
+  })
 
   // Show errors as toasts
   useEffect(() => {
@@ -64,6 +78,35 @@ export default function Reminders() {
       return <Badge variant="danger">Vencido</Badge>
     }
     return <Badge variant="warning">Pendente</Badge>
+  }
+
+  const handleCreateReminder = async () => {
+    if (!newReminder.title || !newReminder.due_date) {
+      toast({ title: 'Erro', description: 'Preencha o titulo e a data de vencimento', variant: 'destructive' })
+      return
+    }
+
+    setIsCreating(true)
+    try {
+      const { error } = await supabase.rpc('create_reminder_from_agent', {
+        p_phone: tenantPhone,
+        p_title: newReminder.title,
+        p_due_date: newReminder.due_date,
+        p_amount: newReminder.amount ? parseFloat(newReminder.amount) : null,
+        p_type: newReminder.type,
+      })
+
+      if (error) throw error
+
+      toast({ title: 'Sucesso', description: 'Lembrete criado com sucesso' })
+      setIsCreateDialogOpen(false)
+      setNewReminder({ title: '', amount: '', due_date: new Date().toISOString().split('T')[0], type: 'bill' })
+      window.location.reload()
+    } catch (err) {
+      toast({ title: 'Erro', description: err instanceof Error ? err.message : 'Erro ao criar lembrete', variant: 'destructive' })
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   const ReminderCard = ({ reminder, showMarkButton = false }: { reminder: Reminder; showMarkButton?: boolean }) => (
@@ -127,10 +170,83 @@ export default function Reminders() {
           <h1 className="text-3xl font-bold text-slate-50">Lembretes</h1>
           <p className="text-slate-400 mt-1">Gerencie seus lembretes de pagamento</p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Lembrete
-        </Button>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Lembrete
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Novo Lembrete</DialogTitle>
+              <DialogDescription>
+                Adicione um lembrete para uma conta a pagar ou receber
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Titulo</Label>
+                <Input
+                  id="title"
+                  placeholder="Ex: Conta de Luz"
+                  value={newReminder.title}
+                  onChange={(e) => setNewReminder({ ...newReminder, title: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Valor (R$) - Opcional</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  placeholder="Ex: 150"
+                  value={newReminder.amount}
+                  onChange={(e) => setNewReminder({ ...newReminder, amount: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="due_date">Data de Vencimento</Label>
+                <Input
+                  id="due_date"
+                  type="date"
+                  value={newReminder.due_date}
+                  onChange={(e) => setNewReminder({ ...newReminder, due_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="type">Tipo</Label>
+                <Select
+                  value={newReminder.type}
+                  onValueChange={(value: 'bill' | 'receivable' | 'custom') => setNewReminder({ ...newReminder, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bill">Conta a Pagar</SelectItem>
+                    <SelectItem value="receivable">Conta a Receber</SelectItem>
+                    <SelectItem value="custom">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} disabled={isCreating}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCreateReminder} disabled={isCreating}>
+                {isCreating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Tabs */}

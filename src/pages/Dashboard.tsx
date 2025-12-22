@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import SummaryCard from '@/components/SummaryCard'
 import TrendChart from '@/components/TrendChart'
 import RecentTransactions from '@/components/RecentTransactions'
@@ -7,7 +7,7 @@ import { useAuth, useSummary, useTransactions, useReminders, useToast } from '@/
 import { Loader2 } from 'lucide-react'
 
 export default function Dashboard() {
-  const { tenantPhone, loading: authLoading } = useAuth()
+  const { tenantPhone, loading: authLoading, authError } = useAuth()
   const { summary, historical, loading: summaryLoading, error: summaryError } = useSummary(tenantPhone)
   const { transactions, loading: transactionsLoading, error: transactionsError } = useTransactions({ tenantPhone, limit: 5 })
   const { pendingReminders, loading: remindersLoading, error: remindersError } = useReminders(tenantPhone)
@@ -15,18 +15,47 @@ export default function Dashboard() {
 
   // Show errors as toasts
   useEffect(() => {
+    if (authError) {
+      toast({ title: 'Erro de autenticacao', description: authError, variant: 'destructive' })
+    }
     if (summaryError) {
       toast({ title: 'Erro ao carregar resumo', description: summaryError, variant: 'destructive' })
     }
     if (transactionsError) {
-      toast({ title: 'Erro ao carregar transações', description: transactionsError, variant: 'destructive' })
+      toast({ title: 'Erro ao carregar transacoes', description: transactionsError, variant: 'destructive' })
     }
     if (remindersError) {
       toast({ title: 'Erro ao carregar lembretes', description: remindersError, variant: 'destructive' })
     }
-  }, [summaryError, transactionsError, remindersError, toast])
+  }, [authError, summaryError, transactionsError, remindersError, toast])
 
   const isLoading = authLoading || summaryLoading || transactionsLoading || remindersLoading
+
+  // Calculate trends comparing current month to previous month
+  const { incomeTrend, expenseTrend, balanceTrend } = useMemo(() => {
+    const calculateTrend = (current: number, previous: number): number => {
+      if (previous === 0) return current > 0 ? 100 : 0
+      return Math.round(((current - previous) / previous) * 100)
+    }
+
+    // Historical data: index 0 is most recent (might be current month), index 1 is previous
+    const previousMonth = historical?.[1]
+
+    return {
+      incomeTrend: calculateTrend(
+        summary?.total_income || 0,
+        previousMonth?.total_income || 0
+      ),
+      expenseTrend: calculateTrend(
+        summary?.total_expense || 0,
+        previousMonth?.total_expense || 0
+      ),
+      balanceTrend: calculateTrend(
+        summary?.balance || 0,
+        previousMonth?.balance || 0
+      ),
+    }
+  }, [summary, historical])
 
   // Transform transactions for RecentTransactions component (expects 'category' not 'category_name')
   const formattedTransactions = transactions.map(t => ({
@@ -73,19 +102,19 @@ export default function Dashboard() {
           <SummaryCard
             title="Receitas"
             value={summary?.total_income || 0}
-            trend={0}
+            trend={incomeTrend}
             type="income"
           />
           <SummaryCard
             title="Despesas"
             value={summary?.total_expense || 0}
-            trend={0}
+            trend={expenseTrend}
             type="expense"
           />
           <SummaryCard
             title="Saldo"
             value={summary?.balance || 0}
-            trend={0}
+            trend={balanceTrend}
             type="balance"
           />
         </div>

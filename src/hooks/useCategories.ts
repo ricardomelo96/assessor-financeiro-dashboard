@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Category, CategorySpending } from '@/types'
 
@@ -11,6 +11,7 @@ export function useCategories(tenantPhone: string | undefined) {
   useEffect(() => {
     if (!tenantPhone) {
       setLoading(false)
+      setError('Telefone do tenant nao disponivel. Faca login novamente.')
       return
     }
 
@@ -57,8 +58,14 @@ export function useCategories(tenantPhone: string | undefined) {
     fetchData()
   }, [tenantPhone])
 
-  const incomeCategories = categories.filter(c => c.type === 'income')
-  const expenseCategories = categories.filter(c => c.type === 'expense')
+  const incomeCategories = useMemo(() =>
+    categories.filter(c => c.type === 'income'),
+    [categories]
+  )
+  const expenseCategories = useMemo(() =>
+    categories.filter(c => c.type === 'expense'),
+    [categories]
+  )
 
   return {
     categories,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Budget } from '@/types'
 
@@ -29,6 +29,7 @@ export function useBudgets(tenantPhone: string | undefined) {
   useEffect(() => {
     if (!tenantPhone) {
       setLoading(false)
+      setError('Telefone do tenant nao disponivel. Faca login novamente.')
       return
     }
 
@@ -66,7 +67,7 @@ export function useBudgets(tenantPhone: string | undefined) {
     fetchBudgets()
   }, [tenantPhone])
 
-  const createBudget = async (
+  const createBudget = useCallback(async (
     categoryHint: string,
     monthlyLimit: number,
     alertThreshold: number = 0.8
@@ -98,7 +99,7 @@ export function useBudgets(tenantPhone: string | undefined) {
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : 'Erro ao criar orcamento' }
     }
-  }
+  }, [tenantPhone])
 
   return { budgets, loading, error, createBudget }
 }

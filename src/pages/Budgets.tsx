@@ -1,14 +1,27 @@
-import { useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BudgetProgress } from '@/components/BudgetProgress'
 import { Plus, TrendingUp, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
-import { useAuth, useBudgets, useToast } from '@/hooks'
+import { useAuth, useBudgets, useCategories, useToast } from '@/hooks'
 
 export default function Budgets() {
   const { tenantPhone, loading: authLoading } = useAuth()
-  const { budgets, loading: budgetsLoading, error: budgetsError } = useBudgets(tenantPhone)
+  const { budgets, loading: budgetsLoading, error: budgetsError, createBudget } = useBudgets(tenantPhone)
+  const { expenseCategories, loading: categoriesLoading } = useCategories(tenantPhone)
   const { toast } = useToast()
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [newBudget, setNewBudget] = useState({
+    category_name: '',
+    monthly_limit: '',
+    alert_threshold: '80',
+  })
 
   // Show errors as toasts
   useEffect(() => {
@@ -17,14 +30,38 @@ export default function Budgets() {
     }
   }, [budgetsError, toast])
 
-  const isLoading = authLoading || budgetsLoading
+  const isLoading = authLoading || budgetsLoading || categoriesLoading
 
-  const okBudgets = budgets.filter(b => b.alert_level === 'OK')
-  const warningBudgets = budgets.filter(b => b.alert_level === 'WARNING')
-  const exceededBudgets = budgets.filter(b => b.alert_level === 'EXCEEDED')
+  const handleCreateBudget = async () => {
+    if (!newBudget.category_name || !newBudget.monthly_limit) {
+      toast({ title: 'Erro', description: 'Selecione uma categoria e defina o limite', variant: 'destructive' })
+      return
+    }
 
-  const totalSpent = budgets.reduce((sum, b) => sum + b.current_spent, 0)
-  const totalLimit = budgets.reduce((sum, b) => sum + b.monthly_limit, 0)
+    setIsSubmitting(true)
+    const result = await createBudget(
+      newBudget.category_name,
+      parseFloat(newBudget.monthly_limit),
+      parseFloat(newBudget.alert_threshold) / 100
+    )
+    setIsSubmitting(false)
+
+    if (result.success) {
+      toast({ title: 'Sucesso', description: 'Orcamento criado com sucesso' })
+      setIsDialogOpen(false)
+      setNewBudget({ category_name: '', monthly_limit: '', alert_threshold: '80' })
+    } else {
+      toast({ title: 'Erro', description: result.error || 'Erro ao criar orcamento', variant: 'destructive' })
+    }
+  }
+
+  const { okBudgets, warningBudgets, exceededBudgets, totalSpent, totalLimit } = useMemo(() => ({
+    okBudgets: budgets.filter(b => b.alert_level === 'OK'),
+    warningBudgets: budgets.filter(b => b.alert_level === 'WARNING'),
+    exceededBudgets: budgets.filter(b => b.alert_level === 'EXCEEDED'),
+    totalSpent: budgets.reduce((sum, b) => sum + b.current_spent, 0),
+    totalLimit: budgets.reduce((sum, b) => sum + b.monthly_limit, 0),
+  }), [budgets])
 
   if (isLoading) {
     return (
@@ -45,10 +82,77 @@ export default function Budgets() {
           <h1 className="text-3xl font-bold text-slate-50">Orçamentos</h1>
           <p className="text-slate-400 mt-1">Gerencie seus orçamentos mensais</p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Orçamento
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Orcamento
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Novo Orcamento</DialogTitle>
+              <DialogDescription>
+                Defina um limite de gastos para uma categoria
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="category">Categoria</Label>
+                <Select
+                  value={newBudget.category_name}
+                  onValueChange={(value) => setNewBudget({ ...newBudget, category_name: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {expenseCategories?.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.name}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="limit">Limite Mensal (R$)</Label>
+                <Input
+                  id="limit"
+                  type="number"
+                  placeholder="Ex: 500"
+                  value={newBudget.monthly_limit}
+                  onChange={(e) => setNewBudget({ ...newBudget, monthly_limit: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="threshold">Alerta em (%)</Label>
+                <Input
+                  id="threshold"
+                  type="number"
+                  placeholder="Ex: 80"
+                  value={newBudget.alert_threshold}
+                  onChange={(e) => setNewBudget({ ...newBudget, alert_threshold: e.target.value })}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCreateBudget} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Summary Cards */}

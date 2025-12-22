@@ -28,7 +28,7 @@ export default function Login() {
         navigate('/dashboard');
       }
     } catch (err: any) {
-      console.error('Login error:', err);
+      if (import.meta.env.DEV) console.error('Login error:', err);
       setError(err.message || 'Erro ao fazer login. Verifique suas credenciais.');
     } finally {
       setLoading(false);

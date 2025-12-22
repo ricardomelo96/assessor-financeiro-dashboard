@@ -7,8 +7,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { EmptyState } from '@/components'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { Receipt } from 'lucide-react'
 
 interface Transaction {
   id: string
@@ -24,10 +26,27 @@ interface RecentTransactionsProps {
 }
 
 export default function RecentTransactions({ transactions }: RecentTransactionsProps) {
+  if (!transactions || transactions.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Transacoes Recentes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmptyState
+            icon={<Receipt className="h-12 w-12" />}
+            title="Nenhuma transacao recente"
+            description="Suas transacoes mais recentes aparecerao aqui."
+          />
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Transações Recentes</CardTitle>
+        <CardTitle>Transacoes Recentes</CardTitle>
       </CardHeader>
       <CardContent>
         <Table>

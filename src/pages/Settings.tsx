@@ -44,7 +44,7 @@ export default function Settings() {
       await supabase.auth.signOut()
       navigate('/login')
     } catch (error) {
-      console.error('Error signing out:', error)
+      if (import.meta.env.DEV) console.error('Error signing out:', error)
     } finally {
       setIsLoading(false)
     }

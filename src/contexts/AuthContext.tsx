@@ -3,6 +3,11 @@ import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Tenant } from '@/types'
 
+// Development-only logging
+const isDev = import.meta.env.DEV
+const devLog = (...args: unknown[]): void => { if (isDev) console.log(...args) }
+const devError = (...args: unknown[]): void => { if (isDev) console.error(...args) }
+
 interface AuthContextType {
   user: User | null
   session: Session | null
@@ -29,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchTenant = async (userId: string): Promise<void> => {
     // Prevent duplicate calls for same user
     if (fetchingRef.current && lastUserIdRef.current === userId) {
-      console.log('[AuthContext] Fetch already in progress for this user, skipping')
+      devLog('[AuthContext] Fetch already in progress for this user, skipping')
       return
     }
 
@@ -37,25 +42,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     lastUserIdRef.current = userId
     setAuthError(null)
 
-    console.log('[AuthContext] Fetching tenant for user:', userId)
+    devLog('[AuthContext] Fetching tenant for user:', userId)
     try {
-      const { data, error } = await supabase
-        .from('tenants')
-        .select('*')
-        .eq('user_id', userId)
-        .single()
+      // Use RPC instead of direct query for better session handling
+      const { data, error } = await supabase.rpc('get_my_tenant')
 
       if (error) {
-        console.error('[AuthContext] Error fetching tenant:', error)
+        devError('[AuthContext] Error fetching tenant:', error)
         setAuthError(error.message)
         return
       }
 
-      console.log('[AuthContext] Tenant fetched:', data?.id)
-      setTenant(data as Tenant)
+      if (!data || data.length === 0) {
+        devError('[AuthContext] No tenant found for user')
+        setAuthError('Tenant nao encontrado. Entre em contato com o suporte.')
+        return
+      }
+
+      const tenantData = data[0]
+      devLog('[AuthContext] Tenant fetched:', tenantData?.id, 'phone:', tenantData?.phone)
+      setTenant(tenantData as Tenant)
       setAuthError(null)
     } catch (error) {
-      console.error('[AuthContext] Exception fetching tenant:', error)
+      devError('[AuthContext] Exception fetching tenant:', error)
       setAuthError(error instanceof Error ? error.message : 'Erro ao carregar dados do usuario')
     } finally {
       fetchingRef.current = false
@@ -66,17 +75,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true
 
     const initializeAuth = async () => {
-      console.log('[AuthContext] Initializing auth...')
+      devLog('[AuthContext] Initializing auth...')
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error) {
-          console.error('[AuthContext] Error getting session:', error)
+          devError('[AuthContext] Error getting session:', error)
         }
 
         if (!mounted) return
 
-        console.log('[AuthContext] Session found:', !!session?.user)
+        devLog('[AuthContext] Session found:', !!session?.user)
         setSession(session)
         setUser(session?.user ?? null)
 
@@ -84,10 +93,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await fetchTenant(session.user.id)
         }
       } catch (error) {
-        console.error('[AuthContext] Exception initializing auth:', error)
+        devError('[AuthContext] Exception initializing auth:', error)
       } finally {
         if (mounted) {
-          console.log('[AuthContext] Setting loading to false')
+          devLog('[AuthContext] Setting loading to false')
           setLoading(false)
         }
       }
@@ -99,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[AuthContext] Auth state changed:', event)
+      devLog('[AuthContext] Auth state changed:', event)
 
       if (!mounted) return
 
@@ -110,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           await fetchTenant(session.user.id)
         } catch (error) {
-          console.error('[AuthContext] Error in onAuthStateChange:', error)
+          devError('[AuthContext] Error in onAuthStateChange:', error)
         }
       } else {
         setTenant(null)
@@ -126,11 +135,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signOut = async () => {
-    console.log('[AuthContext] Signing out...')
+    devLog('[AuthContext] Signing out...')
     try {
       await supabase.auth.signOut()
     } catch (error) {
-      console.error('[AuthContext] Error signing out:', error)
+      devError('[AuthContext] Error signing out:', error)
     }
     setUser(null)
     setSession(null)

@@ -46,7 +46,7 @@ export default function Signup() {
         setConfirmPassword('');
       }
     } catch (err: any) {
-      console.error('Signup error:', err);
+      if (import.meta.env.DEV) console.error('Signup error:', err);
       setError(err.message || 'Erro ao criar conta. Tente novamente.');
     } finally {
       setLoading(false);

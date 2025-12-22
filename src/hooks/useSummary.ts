@@ -35,6 +35,7 @@ export function useSummary(tenantPhone: string | undefined) {
   useEffect(() => {
     if (!tenantPhone) {
       setLoading(false)
+      setError('Telefone do tenant nao disponivel. Faca login novamente.')
       return
     }
 

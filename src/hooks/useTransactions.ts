@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Transaction } from '@/types'
 
@@ -34,6 +34,7 @@ export function useTransactions({ tenantPhone, limit }: UseTransactionsOptions) 
   useEffect(() => {
     if (!tenantPhone) {
       setLoading(false)
+      setError('Telefone do tenant nao disponivel. Faca login novamente.')
       return
     }
 
@@ -75,7 +76,7 @@ export function useTransactions({ tenantPhone, limit }: UseTransactionsOptions) 
     fetchTransactions()
   }, [tenantPhone, limit])
 
-  const addTransaction = async (transaction: Omit<Transaction, 'id' | 'tenant_id' | 'created_at' | 'category_name'>) => {
+  const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'tenant_id' | 'created_at' | 'category_name'>) => {
     try {
       const { data, error } = await supabase
         .from('transactions')
@@ -90,7 +91,7 @@ export function useTransactions({ tenantPhone, limit }: UseTransactionsOptions) 
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : 'Erro ao adicionar' }
     }
-  }
+  }, [])
 
   return { transactions, loading, error, addTransaction }
 }
