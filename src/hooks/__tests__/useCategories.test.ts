@@ -73,15 +73,13 @@ describe('useCategories', () => {
     expect(result.current.error).toBe('Database error')
   })
 
-  it('should not fetch when tenantPhone is undefined', async () => {
+  it('should keep loading true when tenantPhone is undefined (waiting for phone)', () => {
     const { result } = renderHook(() => useCategories(undefined))
 
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false)
-    })
-
+    // Hook keeps loading=true while waiting for tenantPhone to be populated
+    expect(result.current.loading).toBe(true)
     expect(supabase.rpc).not.toHaveBeenCalled()
-    expect(result.current.error).toContain('Telefone')
+    expect(result.current.error).toBeNull()
   })
 
   it('should separate income and expense categories', async () => {
