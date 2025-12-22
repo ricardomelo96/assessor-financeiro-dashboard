@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Switch } from '@/components/ui/switch'
-import { supabase } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/hooks'
 import {
   User,
   Mail,
@@ -18,21 +18,27 @@ import {
 
 export default function Settings() {
   const navigate = useNavigate()
+  const { user, tenant, signOut } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
-  // Mock user data - in a real app, this would come from auth context or Supabase
-  const userData = {
-    name: 'Ricardo Melo',
-    email: 'ricardo@exemplo.com',
-    phone: '+55 (11) 98765-4321',
-    memberSince: '2023-01-15',
-    initials: 'RM',
+  // Get user data from auth context
+  const formatPhone = (phone: string | undefined) => {
+    if (!phone) return '-'
+    // Format: +55 (11) 98765-4321
+    const cleaned = phone.replace(/\D/g, '')
+    if (cleaned.length === 13) {
+      return `+${cleaned.slice(0, 2)} (${cleaned.slice(2, 4)}) ${cleaned.slice(4, 9)}-${cleaned.slice(9)}`
+    }
+    return phone
   }
 
-  // Mock preferences state
+  const getInitials = (name: string | undefined) => {
+    if (!name) return '?'
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  }
+
+  // Preferences state (WhatsApp-based notifications)
   const [preferences, setPreferences] = useState({
-    emailNotifications: true,
-    pushNotifications: false,
     budgetAlerts: true,
     reminderAlerts: true,
     monthlyReports: true,
@@ -41,7 +47,7 @@ export default function Settings() {
   const handleSignOut = async () => {
     setIsLoading(true)
     try {
-      await supabase.auth.signOut()
+      await signOut()
       navigate('/login')
     } catch (error) {
       if (import.meta.env.DEV) console.error('Error signing out:', error)
@@ -89,7 +95,7 @@ export default function Settings() {
           <div className="flex items-start gap-6">
             <Avatar className="h-20 w-20">
               <AvatarFallback className="text-2xl bg-blue-500 text-white">
-                {userData.initials}
+                {getInitials(tenant?.name)}
               </AvatarFallback>
             </Avatar>
 
@@ -100,7 +106,7 @@ export default function Settings() {
                     <User className="h-4 w-4" />
                     <span>Nome</span>
                   </div>
-                  <p className="text-slate-50 font-medium">{userData.name}</p>
+                  <p className="text-slate-50 font-medium">{tenant?.name || '-'}</p>
                 </div>
 
                 <div className="space-y-1">
@@ -108,15 +114,15 @@ export default function Settings() {
                     <Mail className="h-4 w-4" />
                     <span>Email</span>
                   </div>
-                  <p className="text-slate-50 font-medium">{userData.email}</p>
+                  <p className="text-slate-50 font-medium">{user?.email || tenant?.email || '-'}</p>
                 </div>
 
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <Phone className="h-4 w-4" />
-                    <span>Telefone</span>
+                    <span>Telefone (WhatsApp)</span>
                   </div>
-                  <p className="text-slate-50 font-medium">{userData.phone}</p>
+                  <p className="text-slate-50 font-medium">{formatPhone(tenant?.phone)}</p>
                 </div>
 
                 <div className="space-y-1">
@@ -125,14 +131,10 @@ export default function Settings() {
                     <span>Membro desde</span>
                   </div>
                   <p className="text-slate-50 font-medium">
-                    {formatMemberSince(userData.memberSince)}
+                    {user?.created_at ? formatMemberSince(user.created_at) : '-'}
                   </p>
                 </div>
               </div>
-
-              <Button variant="outline" className="mt-4">
-                Editar Perfil
-              </Button>
             </div>
           </div>
         </CardContent>
@@ -143,43 +145,13 @@ export default function Settings() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
-            Notificações
+            Notificações via WhatsApp
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <label className="text-sm font-medium text-slate-50">
-                Notificações por Email
-              </label>
-              <p className="text-xs text-slate-400">
-                Receba atualizações e alertas por email
-              </p>
-            </div>
-            <Switch
-              checked={preferences.emailNotifications}
-              onCheckedChange={(checked) =>
-                setPreferences({ ...preferences, emailNotifications: checked })
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <label className="text-sm font-medium text-slate-50">
-                Notificações Push
-              </label>
-              <p className="text-xs text-slate-400">
-                Receba notificações no navegador
-              </p>
-            </div>
-            <Switch
-              checked={preferences.pushNotifications}
-              onCheckedChange={(checked) =>
-                setPreferences({ ...preferences, pushNotifications: checked })
-              }
-            />
-          </div>
+          <p className="text-sm text-slate-400 mb-4">
+            As notificações são enviadas para o WhatsApp cadastrado: {formatPhone(tenant?.phone)}
+          </p>
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
