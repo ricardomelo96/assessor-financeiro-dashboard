@@ -33,22 +33,40 @@ export function useSummary(tenantPhone: string | undefined) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Immediately set loading false if no phone
     if (!tenantPhone) {
+      setSummary(null)
+      setHistorical([])
       setLoading(false)
       setError('Telefone do tenant nao disponivel. Faca login novamente.')
       return
     }
 
+    let isMounted = true
+    const controller = new AbortController()
+
     async function fetchData() {
+      if (!isMounted) return
       setLoading(true)
       setError(null)
 
       try {
-        // Fetch current month summary
-        const { data: summaryData, error: summaryError } = await supabase
+        // Fetch current month summary with timeout
+        const summaryPromise = supabase
           .rpc('get_monthly_summary_by_phone', { p_phone: tenantPhone })
 
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout ao carregar resumo')), 10000)
+        )
+
+        const { data: summaryData, error: summaryError } = await Promise.race([
+          summaryPromise,
+          timeoutPromise
+        ]) as Awaited<typeof summaryPromise>
+
+        if (!isMounted) return
         if (summaryError) throw summaryError
+
         if (summaryData && summaryData.length > 0) {
           const raw = summaryData[0] as RawSummary
           setSummary({
@@ -58,6 +76,8 @@ export function useSummary(tenantPhone: string | undefined) {
             transaction_count: raw.transaction_count,
             month_name: raw.month_name,
           })
+        } else {
+          setSummary(null)
         }
 
         // Fetch historical data (6 months)
@@ -67,6 +87,7 @@ export function useSummary(tenantPhone: string | undefined) {
             p_months_back: 6
           })
 
+        if (!isMounted) return
         if (historyError) throw historyError
 
         // Transform historical data
@@ -79,15 +100,26 @@ export function useSummary(tenantPhone: string | undefined) {
           transaction_count: h.transaction_count,
         }))
 
-        setHistorical(transformedHistory)
+        if (isMounted) {
+          setHistorical(transformedHistory)
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     fetchData()
+
+    return () => {
+      isMounted = false
+      controller.abort()
+    }
   }, [tenantPhone])
 
   return { summary, historical, loading, error }

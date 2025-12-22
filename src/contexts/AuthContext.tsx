@@ -74,6 +74,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true
 
+    // Safety timeout - ensure loading is set to false after 10 seconds max
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && loading) {
+        devError('[AuthContext] Safety timeout reached, forcing loading to false')
+        setLoading(false)
+        setAuthError('Timeout ao carregar autenticacao. Tente recarregar a pagina.')
+      }
+    }, 10000)
+
     const initializeAuth = async () => {
       devLog('[AuthContext] Initializing auth...')
       try {
@@ -81,6 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error) {
           devError('[AuthContext] Error getting session:', error)
+          if (mounted) {
+            setAuthError(error.message)
+            setLoading(false)
+          }
+          return
         }
 
         if (!mounted) return
@@ -94,10 +108,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         devError('[AuthContext] Exception initializing auth:', error)
+        if (mounted) {
+          setAuthError(error instanceof Error ? error.message : 'Erro de autenticacao')
+        }
       } finally {
         if (mounted) {
           devLog('[AuthContext] Setting loading to false')
           setLoading(false)
+          clearTimeout(safetyTimeout)
         }
       }
     }
