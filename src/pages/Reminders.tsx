@@ -39,12 +39,13 @@ export default function Reminders() {
     type: 'bill' as 'bill' | 'receivable' | 'custom',
   })
 
-  // Show errors as toasts
+  // Show errors as toasts (toast removed from deps to prevent infinite loop)
   useEffect(() => {
     if (remindersError) {
       toast({ title: 'Erro ao carregar lembretes', description: remindersError, variant: 'destructive' })
     }
-  }, [remindersError, toast])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remindersError])
 
   const isLoading = authLoading || remindersLoading
 

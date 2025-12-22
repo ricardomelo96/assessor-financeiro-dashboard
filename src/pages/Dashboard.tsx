@@ -13,7 +13,7 @@ export default function Dashboard() {
   const { pendingReminders, loading: remindersLoading, error: remindersError } = useReminders(tenantPhone)
   const { toast } = useToast()
 
-  // Show errors as toasts
+  // Show errors as toasts (toast removed from deps to prevent infinite loop)
   useEffect(() => {
     if (authError) {
       toast({ title: 'Erro de autenticacao', description: authError, variant: 'destructive' })
@@ -27,7 +27,8 @@ export default function Dashboard() {
     if (remindersError) {
       toast({ title: 'Erro ao carregar lembretes', description: remindersError, variant: 'destructive' })
     }
-  }, [authError, summaryError, transactionsError, remindersError, toast])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authError, summaryError, transactionsError, remindersError])
 
   const isLoading = authLoading || summaryLoading || transactionsLoading || remindersLoading
 

@@ -53,7 +53,7 @@ export default function Transactions() {
     date: new Date().toISOString().split('T')[0],
   })
 
-  // Show errors as toasts
+  // Show errors as toasts (toast removed from deps to prevent infinite loop)
   useEffect(() => {
     if (transactionsError) {
       toast({ title: 'Erro ao carregar transações', description: transactionsError, variant: 'destructive' })
@@ -61,7 +61,8 @@ export default function Transactions() {
     if (categoriesError) {
       toast({ title: 'Erro ao carregar categorias', description: categoriesError, variant: 'destructive' })
     }
-  }, [transactionsError, categoriesError, toast])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactionsError, categoriesError])
 
   const isLoading = authLoading || transactionsLoading || categoriesLoading
 
