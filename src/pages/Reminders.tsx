@@ -101,7 +101,8 @@ export default function Reminders() {
       toast({ title: 'Sucesso', description: 'Lembrete criado com sucesso' })
       setIsCreateDialogOpen(false)
       setNewReminder({ title: '', amount: '', due_date: new Date().toISOString().split('T')[0], type: 'bill' })
-      window.location.reload()
+      // Reload to fetch new data
+      setTimeout(() => window.location.reload(), 500)
     } catch (err) {
       toast({ title: 'Erro', description: err instanceof Error ? err.message : 'Erro ao criar lembrete', variant: 'destructive' })
     } finally {

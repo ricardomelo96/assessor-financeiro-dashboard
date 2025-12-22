@@ -77,21 +77,35 @@ export function useTransactions({ tenantPhone, limit }: UseTransactionsOptions) 
   }, [tenantPhone, limit])
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'tenant_id' | 'created_at' | 'category_name'>) => {
+    if (!tenantPhone) {
+      return { success: false, error: 'Telefone do tenant não disponível' }
+    }
+
     try {
       const { data, error } = await supabase
-        .from('transactions')
-        .insert([transaction])
-        .select()
-        .single()
+        .rpc('create_transaction_from_dashboard', {
+          p_phone: tenantPhone,
+          p_type: transaction.type,
+          p_amount: transaction.amount,
+          p_description: transaction.description,
+          p_category_id: transaction.category_id,
+          p_date: transaction.date,
+        })
 
       if (error) throw error
 
-      setTransactions(prev => [data, ...prev])
-      return { success: true, data }
+      const result = data?.[0]
+      if (!result?.success) {
+        throw new Error(result?.message || 'Erro ao criar transação')
+      }
+
+      // Reload transactions to get the new one with category name
+      window.location.reload()
+      return { success: true, data: result }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : 'Erro ao adicionar' }
     }
-  }, [])
+  }, [tenantPhone])
 
   return { transactions, loading, error, addTransaction }
 }
