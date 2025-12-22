@@ -20,7 +20,7 @@ describe('Transactions Page', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    vi.mocked(useToast).mockReturnValue({ toast: mockToast })
+    vi.mocked(useToast).mockReturnValue({ toast: mockToast, dismiss: vi.fn(), toasts: [] })
 
     vi.mocked(useAuth).mockReturnValue({
       user: { id: 'user-123', email: 'test@test.com' } as any,
@@ -34,7 +34,7 @@ describe('Transactions Page', () => {
 
     vi.mocked(useTransactions).mockReturnValue({
       transactions: [
-        { id: '1', type: 'expense', amount: 100, description: 'Mercado', date: '2025-12-22', category_id: 'cat1', category_name: 'Alimentacao' }
+        { id: '1', tenant_id: 't1', type: 'expense', amount: 100, description: 'Mercado', date: '2025-12-22', category_id: 'cat1', category_name: 'Alimentacao', created_at: '2025-12-22T10:00:00Z' }
       ],
       loading: false,
       error: null,
@@ -43,11 +43,11 @@ describe('Transactions Page', () => {
 
     vi.mocked(useCategories).mockReturnValue({
       categories: [
-        { id: 'cat1', name: 'Alimentacao', type: 'expense', icon: 'shopping' },
-        { id: 'cat2', name: 'Salario', type: 'income', icon: 'dollar' }
+        { id: 'cat1', tenant_id: 't1', name: 'Alimentacao', type: 'expense', icon: 'shopping', sort_order: 1 },
+        { id: 'cat2', tenant_id: 't1', name: 'Salario', type: 'income', icon: 'dollar', sort_order: 1 }
       ],
-      incomeCategories: [{ id: 'cat2', name: 'Salario', type: 'income', icon: 'dollar' }],
-      expenseCategories: [{ id: 'cat1', name: 'Alimentacao', type: 'expense', icon: 'shopping' }],
+      incomeCategories: [{ id: 'cat2', tenant_id: 't1', name: 'Salario', type: 'income', icon: 'dollar', sort_order: 1 }],
+      expenseCategories: [{ id: 'cat1', tenant_id: 't1', name: 'Alimentacao', type: 'expense', icon: 'shopping', sort_order: 1 }],
       spending: [],
       loading: false,
       error: null
@@ -105,8 +105,8 @@ describe('Transactions Page', () => {
   it('should search transactions by description', async () => {
     vi.mocked(useTransactions).mockReturnValue({
       transactions: [
-        { id: '1', type: 'expense', amount: 100, description: 'Mercado', date: '2025-12-22', category_id: 'cat1', category_name: 'Alimentacao' },
-        { id: '2', type: 'income', amount: 500, description: 'Salario', date: '2025-12-20', category_id: 'cat2', category_name: 'Renda' }
+        { id: '1', tenant_id: 't1', type: 'expense', amount: 100, description: 'Mercado', date: '2025-12-22', category_id: 'cat1', category_name: 'Alimentacao', created_at: '2025-12-22T10:00:00Z' },
+        { id: '2', tenant_id: 't1', type: 'income', amount: 500, description: 'Salario', date: '2025-12-20', category_id: 'cat2', category_name: 'Renda', created_at: '2025-12-20T10:00:00Z' }
       ],
       loading: false,
       error: null,
@@ -177,8 +177,8 @@ describe('Transactions Page', () => {
   it('should show transaction amount with correct color', async () => {
     vi.mocked(useTransactions).mockReturnValue({
       transactions: [
-        { id: '1', type: 'expense', amount: 100, description: 'Despesa', date: '2025-12-22', category_id: 'cat1', category_name: 'Food' },
-        { id: '2', type: 'income', amount: 500, description: 'Receita', date: '2025-12-20', category_id: 'cat2', category_name: 'Salary' }
+        { id: '1', tenant_id: 't1', type: 'expense', amount: 100, description: 'Despesa', date: '2025-12-22', category_id: 'cat1', category_name: 'Food', created_at: '2025-12-22T10:00:00Z' },
+        { id: '2', tenant_id: 't1', type: 'income', amount: 500, description: 'Receita', date: '2025-12-20', category_id: 'cat2', category_name: 'Salary', created_at: '2025-12-20T10:00:00Z' }
       ],
       loading: false,
       error: null,

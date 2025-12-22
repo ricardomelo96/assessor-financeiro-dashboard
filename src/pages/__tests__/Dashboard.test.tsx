@@ -29,8 +29,6 @@ vi.mock('recharts', () => ({
 import { useAuth, useSummary, useTransactions, useReminders } from '@/hooks'
 
 describe('Dashboard Page', () => {
-  const mockToast = vi.fn()
-
   beforeEach(() => {
     vi.clearAllMocks()
 
@@ -84,8 +82,8 @@ describe('Dashboard Page', () => {
         month_name: 'Dezembro'
       },
       historical: [
-        { month_name: 'Dezembro', total_income: 5000, total_expense: 3000, balance: 2000 },
-        { month_name: 'Novembro', total_income: 4500, total_expense: 2800, balance: 1700 }
+        { month_name: 'Dezembro', month_year: '2025-12', total_income: 5000, total_expense: 3000, balance: 2000, transaction_count: 10 },
+        { month_name: 'Novembro', month_year: '2025-11', total_income: 4500, total_expense: 2800, balance: 1700, transaction_count: 8 }
       ],
       loading: false,
       error: null
@@ -125,8 +123,8 @@ describe('Dashboard Page', () => {
     })
     vi.mocked(useTransactions).mockReturnValue({
       transactions: [
-        { id: '1', type: 'expense', amount: 100, description: 'Mercado', date: '2025-12-22', category_name: 'Alimentacao' },
-        { id: '2', type: 'income', amount: 500, description: 'Salario', date: '2025-12-20', category_name: 'Renda' }
+        { id: '1', tenant_id: 't1', type: 'expense', amount: 100, description: 'Mercado', date: '2025-12-22', category_id: 'cat1', category_name: 'Alimentacao', created_at: '2025-12-22T10:00:00Z' },
+        { id: '2', tenant_id: 't1', type: 'income', amount: 500, description: 'Salario', date: '2025-12-20', category_id: 'cat2', category_name: 'Renda', created_at: '2025-12-20T10:00:00Z' }
       ],
       loading: false,
       error: null,
@@ -165,10 +163,10 @@ describe('Dashboard Page', () => {
     })
     vi.mocked(useReminders).mockReturnValue({
       reminders: [
-        { id: '1', title: 'Conta de Luz', amount: 150, due_date: '2025-12-25', type: 'expense', is_paid: false }
+        { id: '1', tenant_id: 't1', title: 'Conta de Luz', amount: 150, due_date: '2025-12-25', type: 'expense', is_paid: false }
       ],
       pendingReminders: [
-        { id: '1', title: 'Conta de Luz', amount: 150, due_date: '2025-12-25', type: 'expense', is_paid: false }
+        { id: '1', tenant_id: 't1', title: 'Conta de Luz', amount: 150, due_date: '2025-12-25', type: 'expense', is_paid: false }
       ],
       paidReminders: [],
       overdueReminders: [],
