@@ -28,8 +28,8 @@ export function useBudgets(tenantPhone: string | undefined) {
 
   useEffect(() => {
     if (!tenantPhone) {
-      setLoading(false)
-      setError('Telefone do tenant nao disponivel. Faca login novamente.')
+      // Keep loading state while waiting for tenantPhone - don't set error yet
+      setLoading(true)
       return
     }
 
@@ -76,7 +76,8 @@ export function useBudgets(tenantPhone: string | undefined) {
 
     try {
       const now = new Date()
-      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      // Format as YYYY-MM-01 for PostgreSQL DATE type
+      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
 
       const { data, error } = await supabase
         .rpc('create_budget', {

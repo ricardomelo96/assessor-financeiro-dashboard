@@ -29,8 +29,8 @@ export function useReminders(tenantPhone: string | undefined) {
 
   useEffect(() => {
     if (!tenantPhone) {
-      setLoading(false)
-      setError('Telefone do tenant nao disponivel. Faca login novamente.')
+      // Keep loading state while waiting for tenantPhone - don't set error yet
+      setLoading(true)
       return
     }
 
@@ -76,7 +76,8 @@ export function useReminders(tenantPhone: string | undefined) {
       const { data, error } = await supabase
         .rpc('mark_reminder_paid_by_title', {
           p_phone: tenantPhone,
-          p_title: reminderTitle
+          p_title_hint: reminderTitle,
+          p_create_transaction: true
         })
 
       if (error) throw error

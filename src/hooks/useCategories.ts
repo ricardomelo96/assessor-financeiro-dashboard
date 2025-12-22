@@ -10,8 +10,8 @@ export function useCategories(tenantPhone: string | undefined) {
 
   useEffect(() => {
     if (!tenantPhone) {
-      setLoading(false)
-      setError('Telefone do tenant nao disponivel. Faca login novamente.')
+      // Keep loading state while waiting for tenantPhone - don't set error yet
+      setLoading(true)
       return
     }
 

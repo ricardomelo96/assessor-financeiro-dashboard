@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Transaction } from '@/types'
 
+// Development-only logging
+const isDev = import.meta.env.DEV
+const devLog = (...args: unknown[]): void => { if (isDev) console.log('[useTransactions]', ...args) }
+const devError = (...args: unknown[]): void => { if (isDev) console.error('[useTransactions]', ...args) }
+
 // Helper to convert string/number to number (PostgreSQL NUMERIC comes as string)
 function toNumber(value: string | number | null | undefined): number {
   if (value === null || value === undefined) return 0
@@ -33,8 +38,8 @@ export function useTransactions({ tenantPhone, limit }: UseTransactionsOptions) 
 
   useEffect(() => {
     if (!tenantPhone) {
-      setLoading(false)
-      setError('Telefone do tenant nao disponivel. Faca login novamente.')
+      // Keep loading state while waiting for tenantPhone - don't set error yet
+      setLoading(true)
       return
     }
 
@@ -77,11 +82,16 @@ export function useTransactions({ tenantPhone, limit }: UseTransactionsOptions) 
   }, [tenantPhone, limit])
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'tenant_id' | 'created_at' | 'category_name'>) => {
+    devLog('addTransaction called with:', transaction)
+    devLog('tenantPhone:', tenantPhone)
+
     if (!tenantPhone) {
+      devError('No tenantPhone available!')
       return { success: false, error: 'Telefone do tenant não disponível' }
     }
 
     try {
+      devLog('Calling RPC create_transaction_from_dashboard...')
       const { data, error } = await supabase
         .rpc('create_transaction_from_dashboard', {
           p_phone: tenantPhone,
@@ -92,17 +102,22 @@ export function useTransactions({ tenantPhone, limit }: UseTransactionsOptions) 
           p_date: transaction.date,
         })
 
+      devLog('RPC response:', { data, error })
+
       if (error) throw error
 
       const result = data?.[0]
       if (!result?.success) {
+        devError('RPC returned failure:', result?.message)
         throw new Error(result?.message || 'Erro ao criar transação')
       }
 
+      devLog('Transaction created successfully:', result.transaction_id)
       // Reload transactions to get the new one with category name
       window.location.reload()
       return { success: true, data: result }
     } catch (err) {
+      devError('Exception in addTransaction:', err)
       return { success: false, error: err instanceof Error ? err.message : 'Erro ao adicionar' }
     }
   }, [tenantPhone])

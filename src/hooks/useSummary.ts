@@ -33,12 +33,9 @@ export function useSummary(tenantPhone: string | undefined) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Immediately set loading false if no phone
+    // Keep loading state while waiting for tenantPhone - don't set error yet
     if (!tenantPhone) {
-      setSummary(null)
-      setHistorical([])
-      setLoading(false)
-      setError('Telefone do tenant nao disponivel. Faca login novamente.')
+      setLoading(true)
       return
     }
 

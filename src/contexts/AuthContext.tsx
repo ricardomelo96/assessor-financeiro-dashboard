@@ -43,9 +43,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthError(null)
 
     devLog('[AuthContext] Fetching tenant for user:', userId)
+
     try {
-      // Use RPC instead of direct query for better session handling
-      const { data, error } = await supabase.rpc('get_my_tenant')
+      // Call RPC with timeout to avoid hanging
+      devLog('[AuthContext] Calling get_my_tenant RPC...')
+
+      const rpcPromise = supabase.rpc('get_my_tenant')
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('RPC timeout after 5 seconds')), 5000)
+      )
+
+      const { data, error } = await Promise.race([rpcPromise, timeoutPromise]) as Awaited<typeof rpcPromise>
+
+      devLog('[AuthContext] get_my_tenant response:', { data, error, dataLength: data?.length })
 
       if (error) {
         devError('[AuthContext] Error fetching tenant:', error)
@@ -54,13 +64,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!data || data.length === 0) {
-        devError('[AuthContext] No tenant found for user')
+        devError('[AuthContext] No tenant found for user - auth.uid() may be returning NULL')
+        devError('[AuthContext] This usually means the JWT token is not being sent with the request')
         setAuthError('Tenant nao encontrado. Entre em contato com o suporte.')
         return
       }
 
       const tenantData = data[0]
-      devLog('[AuthContext] Tenant fetched:', tenantData?.id, 'phone:', tenantData?.phone)
+      devLog('[AuthContext] Tenant fetched successfully:', tenantData?.id, 'phone:', tenantData?.phone)
       setTenant(tenantData as Tenant)
       setAuthError(null)
     } catch (error) {
@@ -83,67 +94,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }, 10000)
 
-    const initializeAuth = async () => {
-      devLog('[AuthContext] Initializing auth...')
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-
-        if (error) {
-          devError('[AuthContext] Error getting session:', error)
-          if (mounted) {
-            setAuthError(error.message)
-            setLoading(false)
-          }
-          return
-        }
-
-        if (!mounted) return
-
-        devLog('[AuthContext] Session found:', !!session?.user)
-        setSession(session)
-        setUser(session?.user ?? null)
-
-        if (session?.user) {
-          await fetchTenant(session.user.id)
-        }
-      } catch (error) {
-        devError('[AuthContext] Exception initializing auth:', error)
-        if (mounted) {
-          setAuthError(error instanceof Error ? error.message : 'Erro de autenticacao')
-        }
-      } finally {
-        if (mounted) {
-          devLog('[AuthContext] Setting loading to false')
-          setLoading(false)
-          clearTimeout(safetyTimeout)
-        }
-      }
-    }
-
-    initializeAuth()
-
-    // Listen for auth changes
+    // Listen for auth changes - this is the source of truth for authentication state
+    // We rely on onAuthStateChange for ALL auth state, including initial session
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      devLog('[AuthContext] Auth state changed:', event)
+      devLog('[AuthContext] Auth state changed:', event, 'user:', session?.user?.id)
 
       if (!mounted) return
 
       setSession(session)
       setUser(session?.user ?? null)
 
-      if (session?.user) {
+      // Only fetch tenant on INITIAL_SESSION or SIGNED_IN after initial load
+      // SIGNED_IN fires before INITIAL_SESSION and the session may not be fully ready
+      // So we skip SIGNED_IN if we're still in initial loading state
+      const shouldFetchTenant = session?.user && (
+        event === 'INITIAL_SESSION' ||
+        event === 'TOKEN_REFRESHED' ||
+        (event === 'SIGNED_IN' && !loading) // Only on SIGNED_IN if not initial load
+      )
+
+      if (shouldFetchTenant) {
+        devLog('[AuthContext] Fetching tenant for event:', event)
+        devLog('[AuthContext] Session access_token (first 50 chars):', session.access_token?.substring(0, 50))
+
         try {
           await fetchTenant(session.user.id)
         } catch (error) {
-          devError('[AuthContext] Error in onAuthStateChange:', error)
+          devError('[AuthContext] Error fetching tenant:', error)
+          setAuthError('Erro ao carregar dados do usuario. Tente fazer logout e login novamente.')
         }
+      } else if (session?.user) {
+        devLog('[AuthContext] Skipping tenant fetch for event:', event, '(waiting for INITIAL_SESSION)')
       } else {
+        devLog('[AuthContext] No user in session, clearing tenant')
         setTenant(null)
       }
 
-      setLoading(false)
+      if (mounted) {
+        devLog('[AuthContext] Setting loading to false after event:', event)
+        setLoading(false)
+        clearTimeout(safetyTimeout)
+      }
     })
 
     return () => {
